@@ -93,20 +93,24 @@ function pieceAttacksSquare(board, r, c, tr, tc) {
     return dr === pr && Math.abs(dc) === 1;
   }
   if (p.type === 'n') return (Math.abs(dr) === 1 && Math.abs(dc) === 2) || (Math.abs(dr) === 2 && Math.abs(dc) === 1);
-  for (const ray of rayDirs(p.type)) {
-    if (dr * ray.dc !== dc * ray.dr) continue;          // not on this ray
-    if (!ray.slide && Math.max(Math.abs(dr), Math.abs(dc)) !== 1) continue; // king steps only 1 square
-    const stepR = Math.sign(ray.dr || dc);              // robust direction: handles dc===0 rays
-    const stepC = Math.sign(ray.dc || dr);
-    let rr = r + stepR, cc = c + stepC;
-    for (;;) {
-      if (!inBounds(rr, cc)) return false;              // ran off the board before reaching target
-      if (rr === tr && cc === tc) return true;          // clear line: target square is never a blocker
-      if (board[rr][cc]) return false;                  // only INTERVENING pieces block the ray
-      rr += stepR; cc += stepC;
-    }
+  if (p.type === 'k') return Math.max(Math.abs(dr), Math.abs(dc)) === 1;
+  // Sliders (r, b, q): target must lie on a rank/file/diagonal through the
+  // piece. Walk from the attacker toward the target with unit steps derived
+  // from (dr,dc). Only INTERVENING pieces block — the target square itself
+  // never blocks its own attack, so pins are detected correctly (a rook
+  // attacks the knight shielding the king, and through it the king).
+  const aligned = dr === 0 || dc === 0 || Math.abs(dr) === Math.abs(dc);
+  if (!aligned || (dr === 0 && dc === 0)) return false;
+  if (p.type === 'b' && !(dr !== 0 && dc !== 0 && Math.abs(dr) === Math.abs(dc))) return false;
+  if (p.type === 'r' && !(dr === 0 || dc === 0)) return false;
+  const stepR = Math.sign(dr), stepC = Math.sign(dc);
+  let rr = r + stepR, cc = c + stepC;
+  while (rr !== tr || cc !== tc) {                      // stop AT the target; it never blocks
+    if (!inBounds(rr, cc)) return false;                // ran off board before target
+    if (board[rr][cc]) return false;                    // an intervening piece blocks the ray
+    rr += stepR; cc += stepC;
   }
-  return false;
+  return true;                                          // clear line to target
 }
 
 /* All pieces of `color` attacking square (tr,tc). */
