@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gambit Clash — Chess × Turn-Based Combat Prototype</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ MAIN MENU ============ -->
+<div id="menu" class="screen active">
+  <div class="menu-inner">
+    <h1 class="logo">♞ GAMBIT <span>CLASH</span></h1>
+    <p class="tagline">Chess is the battlefield. Every capture becomes a duel.<br>
+      <b>The board determines the party.</b></p>
+
+    <div class="menu-row">
+      <div class="menu-col">
+        <h3>Opponent</h3>
+        <div class="btn-group" id="modeGroup">
+          <button class="opt selected" data-mode="ai">vs CPU</button>
+          <button class="opt" data-mode="hotseat">Hotseat PvP</button>
+        </div>
+        <h3>CPU Difficulty</h3>
+        <div class="btn-group" id="diffGroup">
+          <button class="opt" data-diff="easy">Easy</button>
+          <button class="opt selected" data-diff="normal">Normal</button>
+          <button class="opt" data-diff="hard">Hard</button>
+        </div>
+      </div>
+
+      <div class="menu-col">
+        <h3>Your Set — Samurai (aggression · parry · Resolve)</h3>
+        <div class="set-card samurai">
+          <div class="set-icon">⚔</div>
+          <ul>
+            <li><b>Passive — Bushido:</b> your attacks deal +15% damage.</li>
+            <li><b>Precision Stance:</b> parry window is larger.</li>
+            <li><b>Iaijutsu:</b> heavy strike — punishes dodges, breaks blocks.</li>
+            <li><b>Rally Banner (support):</b> +20% damage to attacker this battle.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="menu-col">
+        <h3>CPU Set — Shinobi (evasion · poison · deception)</h3>
+        <div class="set-card shinobi">
+          <div class="set-icon">🌑</div>
+          <ul>
+            <li><b>Passive — Shadow:</b> dodge grants +1 Momentum &amp; applies Poison.</li>
+            <li><b>Substitution:</b> chance to auto-dodge lethal blows.</li>
+            <li><b>Poison Kunai:</b> light strike that stacks Venom.</li>
+            <li><b>Smoke Screen (support):</b> attacker suffers −25% accuracy next turn.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <button id="startBtn" class="big-btn">▶ START MATCH</button>
+    <details class="rules">
+      <summary>How it works</summary>
+      <div class="rules-body">
+        <p><b>Loop:</b> Chess move → capture triggers an RPG engagement → consequences return to the board.</p>
+        <p><b>Party rule:</b> when piece A attacks piece B, every allied piece that directly threatens B joins the <i>attacker's</i> side; every enemy piece that directly threatens A joins the <i>defender's</i> side. Position pieces so your battles are won before they start.</p>
+        <p><b>Combat:</b> attackers choose Quick ⚡ / Heavy 🗡 / Feint 🎭. Defenders time DODGE or BLOCK as a marker sweeps the bar — Perfect timing beats everything. Hits build <b>Momentum</b> → spend it on abilities. Winning combat captures the piece; losing means your attacker retreats wounded. You can also disengage (the defender escapes with a Fatigue debuff).</p>
+        <p><b>HP persists on the board.</b> Wounded pieces fight weaker — heal slowly each turn. Damage to a King decides the match.</p>
+      </div>
+    </details>
+  </div>
+</div>
+
+<!-- ============ GAME SCREEN ============ -->
+<div id="game" class="screen">
+  <div class="game-layout">
+
+    <aside class="left-panel">
+      <div class="panel-box">
+        <h2>♜ Black — Shinobi</h2>
+        <div id="blackInfo" class="player-info"></div>
+      </div>
+      <div class="panel-box grow">
+        <h2>Log</h2>
+        <div id="log" class="log"></div>
+      </div>
+      <div class="panel-box">
+        <h2>♔ White — Samurai</h2>
+        <div id="whiteInfo" class="player-info"></div>
+      </div>
+    </aside>
+
+    <main class="board-area">
+      <div id="turnBanner" class="turn-banner">White's turn</div>
+      <div id="board" class="board"></div>
+      <div id="evalBarWrap" class="eval-bar"><div id="evalBar" class="eval-fill"></div></div>
+      <div id="hint" class="hint">Select a piece to see its attack influence — positioning builds your battle parties.</div>
+    </main>
+
+    <aside class="right-panel">
+      <div class="panel-box">
+        <h2>Influence Preview</h2>
+        <div id="preview" class="preview">Hover/select a piece to preview who would join if it attacks.</div>
+      </div>
+      <div class="panel-box">
+        <h2>Statuses</h2>
+        <div id="statusList" class="status-list">No active statuses.</div>
+      </div>
+      <button id="resignBtn" class="small-btn">Resign Match</button>
+    </aside>
+  </div>
+</div>
+
+<!-- ============ COMBAT OVERLAY ============ -->
+<div id="combat" class="overlay hidden">
+  <div class="combat-frame">
+    <div class="combat-header">
+      <div class="party-side" id="defPartyBox">
+        <div class="party-title" id="defTitle">DEFENDER</div>
+        <div id="defParty" class="party"></div>
+      </div>
+      <div class="vs">⚔</div>
+      <div class="party-side" id="atkPartyBox">
+        <div class="party-title" id="atkTitle">ATTACKER</div>
+        <div id="atkParty" class="party"></div>
+      </div>
+    </div>
+
+    <div class="arena">
+      <div id="spriteDef" class="sprite def-sprite"></div>
+      <div id="fxLayer" class="fx-layer"></div>
+      <div id="spriteAtk" class="sprite atk-sprite"></div>
+      <div id="combatMsg" class="combat-msg"></div>
+    </div>
+
+    <!-- timing bar for defense -->
+    <div id="timingWrap" class="timing-wrap hidden">
+      <div class="timing-label" id="timingLabel">INCOMING — time your defense!</div>
+      <div class="timing-bar" id="timingBar">
+        <div class="zone block-zone" id="blockZone"></div>
+        <div class="zone perfect-zone" id="perfectZone"></div>
+        <div class="marker" id="marker"></div>
+      </div>
+      <div class="defense-hint">DODGE: tap anywhere / SPACE &nbsp;·&nbsp; BLOCK: hold B / right-click</div>
+    </div>
+
+    <!-- attacker action menu -->
+    <div id="actionMenu" class="action-menu hidden">
+      <div class="action-row" id="mainActions">
+        <button class="act quick"  data-a="quick">⚡ QUICK<br><span>fast · beats Counter · low dmg</span></button>
+        <button class="act heavy"  data-a="heavy">🗡 HEAVY<br><span>breaks Block · punished by Dodge</span></button>
+        <button class="act feint"  data-a="feint">🎭 FEINT<br><span>punishes Dodge · weak vs Block</span></button>
+      </div>
+      <div class="action-row" id="abilityActions"></div>
+      <div class="momentum-meter">MOMENTUM <span id="atkMomentum">0</span>/3</div>
+    </div>
+
+    <div id="combatFooter" class="combat-footer">
+      <button id="disengageBtn" class="small-btn danger">🏳 Disengage</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ RESULT OVERLAY ============ -->
+<div id="resultModal" class="overlay hidden">
+  <div class="modal">
+    <h2 id="resultTitle">Victory</h2>
+    <p id="resultText"></p>
+    <button id="resultBtn" class="big-btn">OK</button>
+  </div>
+</div>
+
+<script src="js/chess.js"></script>
+<script src="js/combat.js"></script>
+<script src="js/ai.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
