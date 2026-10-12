@@ -95,14 +95,16 @@ function pieceAttacksSquare(board, r, c, tr, tc) {
   if (p.type === 'n') return (Math.abs(dr) === 1 && Math.abs(dc) === 2) || (Math.abs(dr) === 2 && Math.abs(dc) === 1);
   for (const ray of rayDirs(p.type)) {
     if (dr * ray.dc !== dc * ray.dr) continue;          // not on this ray
-    if (Math.sign(dr || dc) !== Math.sign(ray.dr || ray.dc)) continue;
-    if (!ray.slide) return Math.abs(dr) <= 1 && Math.abs(dc) <= 1;
-    let rr = r + ray.dr, cc = c + ray.dc;
-    while (rr !== tr || cc !== tc) {
-      if (board[rr][cc]) return false;                  // an intervening piece blocks the ray
-      rr += ray.dr; cc += ray.dc;
+    if (!ray.slide && Math.max(Math.abs(dr), Math.abs(dc)) !== 1) continue; // king steps only 1 square
+    const stepR = Math.sign(ray.dr || dc);              // robust direction: handles dc===0 rays
+    const stepC = Math.sign(ray.dc || dr);
+    let rr = r + stepR, cc = c + stepC;
+    for (;;) {
+      if (!inBounds(rr, cc)) return false;              // ran off the board before reaching target
+      if (rr === tr && cc === tc) return true;          // clear line: target square is never a blocker
+      if (board[rr][cc]) return false;                  // only INTERVENING pieces block the ray
+      rr += stepR; cc += stepC;
     }
-    return true;                                        // clear line to target square
   }
   return false;
 }
